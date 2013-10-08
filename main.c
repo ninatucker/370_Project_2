@@ -35,6 +35,8 @@ int convertNum(int);
 int
 main(int argc, char *argv[])
 {
+    
+    //test comment
     int i;
     char line[MAXLINELENGTH];
     stateType state;
