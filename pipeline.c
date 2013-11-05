@@ -115,11 +115,17 @@ main(int argc, char *argv[])
     }
 
 
-    // begin my code
+    // Initialize
     stateType newState;
     initRegs(&state);
     state.pc = 0;
-
+    state.cycles = 0;
+    state.IFID.instr = NOOPINSTRUCTION;
+    state.IDEX.instr = NOOPINSTRUCTION;
+    state.EXMEM.instr = NOOPINSTRUCTION;
+    state.MEMWB.instr = NOOPINSTRUCTION;
+    state.WBEND.instr = NOOPINSTRUCTION;
+    // end Initialize
 
 
 
