@@ -1,0 +1,28 @@
+When adding a stall for lw dependency, the pc should not increase
+ - could this be your problem?
+ 
+ I don't think you should need it, because every pipeline register has an 
+ instruction reg, which also contains the register numbers if you need them. 
+ The extra WBEND register is give so you can detect 
+ and forward data for dependent instructions that are 3 instructions apart.
+ 
+As for your ALU question:
+"The ALU should be able to take its inputs from any pipeline register (instead 
+of just the IDEX register)." -from the spec
+ 
+But it seems you are asking if you need the "ALU" to check previous 
+instructions, which you don't.You can compare instructions from all 
+and anything inside pipeline registers without the use of the ALU.
+The explanation for this is, correct me if I am wrong, that 
+you are creating a separate control logic for data forwarding,
+ which is going to be separate from the ALU, and can see all the 
+ pipeline stages at once in a cycle.
+ 
+ EDIT:
+The student answer is generally correct: you don't need an array of 
+destReg's because at the EX stage you can read the instructions from 
+other pipeline registers, but if you want to do so there is certainly 
+nothing stopping you. And the student is right, there is separate control
+ logic for data forwarding, not part of the ALU. In my original answer 
+ I didn't think about the potential for confusion there.
+ 

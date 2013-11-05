@@ -1,0 +1,24 @@
+	lw 0 7 negone
+	lw 0 6 two
+	lw 0 5 ten
+	lw 0 4 four
+	noop		
+	noop		
+	noop		
+loo	add 5 7 5
+	noop
+	noop
+	noop
+	beq	5 0 done
+	noop
+	noop
+	noop
+	beq 0 0 loo
+	noop
+	noop 
+	noop
+done halt
+negone .fill -1
+two .fill 2
+ten .fill 10
+four .fill 4

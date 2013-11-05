@@ -127,11 +127,6 @@ main(int argc, char *argv[])
     state.WBEND.instr = NOOPINSTRUCTION;
     // end Initialize
 
-
-
-
-
-
 	while (1) {
 
 	printState(&state);
@@ -160,17 +155,16 @@ main(int argc, char *argv[])
 
 
 	/* --------------------- ID stage --------------------- */
-
 	newState.IDEX.pcPlus1 = state.IFID.pcPlus1;
 	newState.IDEX.readRegA = state.reg[field0(state.IFID.instr)];
 	newState.IDEX.readRegB = state.reg[field1(state.IFID.instr)];
-	newState.IDEX.offset = field2(state.IFID.instr);
+	newState.IDEX.offset = convertNum(field2(state.IFID.instr));
 	newState.IDEX.instr = state.IFID.instr;
 
 
 	/* --------------------- EX stage --------------------- */
-
-	if(opcode(state.IDEX.instr) == BEQ)
+	if(opcode(state.IDEX.instr) == BEQ
+			&& state.IDEX.readRegA == state.IDEX.readRegB)
 		newState.EXMEM.branchTarget = state.IDEX.offset + state.IDEX.pcPlus1;
 	else
 		newState.EXMEM.branchTarget = 0;
@@ -185,8 +179,8 @@ main(int argc, char *argv[])
 	newState.EXMEM.readRegB = state.IDEX.readRegB;
 	newState.EXMEM.instr = state.IDEX.instr;
 
-	/* --------------------- MEM stage --------------------- */
 
+	/* --------------------- MEM stage --------------------- */
 	newState.MEMWB.instr = state.EXMEM.instr;
 	if(opcode(state.EXMEM.instr) == LW)
 		newState.MEMWB.writeData = state.dataMem[state.EXMEM.aluResult];
@@ -206,62 +200,12 @@ main(int argc, char *argv[])
 	newState.WBEND.writeData = state.MEMWB.writeData;
 
 
-
-
-
-
+	/* --------------------- OTHER --------------------- */
 	state = newState; /* this is the last statement before end of the loop.
 			It marks the end of the cycle and updates the
 			current state with the values calculated in this
 			cycle */
 	}
-
-//    while(!halt){
-//    	printState(&state);
-//    	int mem = state.mem[state.pc];
-//
-//    	if(mem >> 22 == 6){ // halt
-//    		halt = 1;
-//    		state.pc++;
-//    	}
-//    	else if (mem >> 22 == 7){
-//    		state.pc++;
-//    	}
-//    	else if(mem >> 22 == 0){ // add
-//    		state.reg[getDest(mem)] = state.reg[getArg0(mem)] +
-//    				state.reg[getArg1(mem)];
-//    		state.pc++;
-//    	}
-//    	else if (mem >> 22 == 1){ // nand
-//    		state.reg[getDest(mem)] = ~(state.reg[getArg0(mem)] &
-//    				state.reg[getArg1(mem)]);
-//    		state.pc++;
-//    	}
-//    	else if (mem >> 22 == 2){ //lw
-//    		state.reg[getArg1(mem)] = state.mem[state.reg[getArg0(mem)] +
-//    				getOff(mem)];
-//    		state.pc++;
-//    	}
-//    	else if (mem >> 22 == 3){ //sw
-//    		state.mem[state.reg[getArg0(mem)] + getOff(mem)] =
-//    				state.reg[getArg1(mem)];
-//    		state.pc++;
-//    	}
-//    	else if (mem >> 22 == 4){  //beq
-//    		if (state.reg[getArg0(mem)] == state.reg[getArg1(mem)])
-//    			state.pc = state.pc + 1 + getOff(mem);
-//    		else
-//    			state.pc++;
-//    	}
-//    	else if(mem >> 22 == 5){ //jalr
-//    		state.reg[getArg1(mem)] = state.pc + 1;
-//    		state.pc = state.reg[getArg0(mem)];
-//    	}
-//
-//    	count++;
-//    }
-//    printState(&state);
-
 
     return(0);
 }
