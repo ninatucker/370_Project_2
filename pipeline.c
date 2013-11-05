@@ -173,7 +173,7 @@ main(int argc, char *argv[])
 		newState.EXMEM.aluResult = state.IDEX.readRegA + state.IDEX.readRegB;
 	else if(opcode(state.IDEX.instr) == NAND)
 		newState.EXMEM.aluResult= ~(state.IDEX.readRegA & state.IDEX.readRegB);
-	else //if(opCode(state.IDEX.instr) == LW || opCode(state.IDEX.instr) == SW)
+	else if(opcode(state.IDEX.instr) == LW || opcode(state.IDEX.instr) == SW)
 		newState.EXMEM.aluResult= state.IDEX.readRegA + state.IDEX.offset;
 
 	newState.EXMEM.readRegB = state.IDEX.readRegB;
@@ -182,9 +182,9 @@ main(int argc, char *argv[])
 	/* --------------------- MEM stage --------------------- */
 
 	newState.MEMWB.instr = state.EXMEM.instr;
-	if(opcode(state.EXMEM.instr == LW))
+	if(opcode(state.EXMEM.instr) == LW)
 		newState.MEMWB.writeData = state.dataMem[state.EXMEM.aluResult];
-	else if(opcode(state.EXMEM.instr == SW))
+	else if(opcode(state.EXMEM.instr) == SW)
 		newState.dataMem[state.EXMEM.aluResult] = state.EXMEM.readRegB;
 	else
 		newState.MEMWB.writeData = state.EXMEM.aluResult;
@@ -195,6 +195,9 @@ main(int argc, char *argv[])
 		newState.reg[field2(state.MEMWB.instr)] = state.MEMWB.writeData;
 	else if(opcode(state.MEMWB.instr) == LW)
 		newState.reg[field1(state.MEMWB.instr)] = state.MEMWB.writeData;
+
+	newState.WBEND.instr = state.MEMWB.instr;	//FOWARD TO WBEND
+	newState.WBEND.writeData = state.MEMWB.writeData;
 
 
 
