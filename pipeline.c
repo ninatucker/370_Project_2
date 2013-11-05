@@ -125,6 +125,7 @@ main(int argc, char *argv[])
 
 
 
+
 	while (1) {
 
 	printState(&state);
@@ -140,14 +141,65 @@ main(int argc, char *argv[])
 	newState.cycles++;
 
 	/* --------------------- IF stage --------------------- */
+	if(state.EXMEM.branchTarget == 0){
+		newState.IFID.pcPlus1 = state.pc + 1;
+		newState.pc = state.pc + 1;
+	}
+	else {
+		newState.IFID.pcPlus1 = state.EXMEM.branchTarget;
+		newState.pc = state.EXMEM.branchTarget;
+	}
+	newState.IFID.instr = state.instrMem[state.pc];
+	//newState.IFID.pcPlus1 = state.pc + 1;
+
 
 	/* --------------------- ID stage --------------------- */
 
+	newState.IDEX.pcPlus1 = state.IFID.pcPlus1;
+	newState.IDEX.readRegA = state.reg[field0(state.IFID.instr)];
+	newState.IDEX.readRegB = state.reg[field1(state.IFID.instr)];
+	newState.IDEX.offset = field2(state.IFID.instr);
+	newState.IDEX.instr = state.IFID.instr;
+
+
 	/* --------------------- EX stage --------------------- */
+
+	if(opcode(state.IDEX.instr) == BEQ)
+		newState.EXMEM.branchTarget = state.IDEX.offset + state.IDEX.pcPlus1;
+	else
+		newState.EXMEM.branchTarget = 0;
+
+	if(opcode(state.IDEX.instr) == ADD)
+		newState.EXMEM.aluResult = state.IDEX.readRegA + state.IDEX.readRegB;
+	else if(opcode(state.IDEX.instr) == NAND)
+		newState.EXMEM.aluResult= ~(state.IDEX.readRegA & state.IDEX.readRegB);
+	else //if(opCode(state.IDEX.instr) == LW || opCode(state.IDEX.instr) == SW)
+		newState.EXMEM.aluResult= state.IDEX.readRegA + state.IDEX.offset;
+
+	newState.EXMEM.readRegB = state.IDEX.readRegB;
+	newState.EXMEM.instr = state.IDEX.instr;
 
 	/* --------------------- MEM stage --------------------- */
 
+	newState.MEMWB.instr = state.EXMEM.instr;
+	if(opcode(state.EXMEM.instr == LW))
+		newState.MEMWB.writeData = state.dataMem[state.EXMEM.aluResult];
+	else if(opcode(state.EXMEM.instr == SW))
+		newState.dataMem[state.EXMEM.aluResult] = state.EXMEM.readRegB;
+	else
+		newState.MEMWB.writeData = state.EXMEM.aluResult;
+
+
 	/* --------------------- WB stage --------------------- */
+	if(opcode(state.MEMWB.instr) == ADD || opcode(state.MEMWB.instr) == NAND)
+		newState.reg[field2(state.MEMWB.instr)] = state.MEMWB.writeData;
+	else if(opcode(state.MEMWB.instr) == LW)
+		newState.reg[field1(state.MEMWB.instr)] = state.MEMWB.writeData;
+
+
+
+
+
 
 	state = newState; /* this is the last statement before end of the loop.
 			It marks the end of the cycle and updates the
