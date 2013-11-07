@@ -1,0 +1,8 @@
+	lw 0 7 negone
+	lw 0 4 four
+	add 4 7 1
+done halt
+negone .fill -1
+two .fill 3
+ten .fill 4
+four .fill 3

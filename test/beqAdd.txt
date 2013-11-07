@@ -20,5 +20,5 @@ loo	add 5 7 5
 done halt
 negone .fill -1
 two .fill 2
-ten .fill 10
+ten .fill 3
 four .fill 4

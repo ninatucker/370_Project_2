@@ -146,7 +146,7 @@ main(int argc, char *argv[])
 
 	/* --------------------- IF stage --------------------- */
 
-	if(!lwStall(&state)){
+	//if(!lwStall(&state)){
 	//if(state.EXMEM.branchTarget == 0){
 		newState.IFID.pcPlus1 = state.pc + 1;
 		newState.pc = state.pc + 1;
@@ -163,24 +163,33 @@ main(int argc, char *argv[])
 		//newState.IFID.instr = NOOPINSTRUCTION;
 	//newState.IFID.pcPlus1 = state.pc + 1;
 
-	}
-	else{
-		newState.IFID.instr = NOOPINSTRUCTION;
-	}
+	//}
+	//else{
+	//	newState.IFID.instr = NOOPINSTRUCTION;
+	//}
 
 
 	/* --------------------- ID stage --------------------- */
 
-	//if(!lwStall(&state)){
+	if(!lwStall(&state)){
 	newState.IDEX.pcPlus1 = state.IFID.pcPlus1;
 	newState.IDEX.readRegA = state.reg[field0(state.IFID.instr)];
 	newState.IDEX.readRegB = state.reg[field1(state.IFID.instr)];
 	newState.IDEX.offset = convertNum(field2(state.IFID.instr));
 	newState.IDEX.instr = state.IFID.instr;
-	//}
-	//else{
-	//	newState.IDEX.instr = NOOPINSTRUCTION;
-//	}
+	}
+	else{
+		//newState.IFID.instr = NOOPINSTRUCTION;
+		newState.pc = state.pc;
+		newState.IDEX.instr = NOOPINSTRUCTION;
+		//newState.IDEX.pcPlus1 = state.IFID.pcPlus1;
+		//newState.IDEX.readRegA = state.reg[field0(state.IFID.instr)];
+		//newState.IDEX.readRegB = state.reg[field1(state.IFID.instr)];
+		//newState.IDEX.offset = convertNum(field2(state.IFID.instr));
+		//newState.IDEX.instr = state.IFID.instr;
+		newState.IFID.instr = state.IFID.instr;
+		newState.IFID.pcPlus1 = state.IFID.pcPlus1;
+	}
 
 
 	/* --------------------- EX stage --------------------- */
@@ -190,16 +199,16 @@ main(int argc, char *argv[])
 	//else
 	//	newState.EXMEM.branchTarget = 0;
 
-	if(opcode(state.IDEX.instr) == ADD)
-		newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
-	else if(opcode(state.IDEX.instr) == NAND)
-		newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
-	else if(opcode(state.IDEX.instr) == LW || opcode(state.IDEX.instr) == SW)
-		newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
-	else if(opcode(state.IDEX.instr) == BEQ)
-		newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
-
-	newState.EXMEM.readRegB = state.IDEX.readRegB;
+	//if(opcode(state.IDEX.instr) == ADD)
+	newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
+	//else if(opcode(state.IDEX.instr) == NAND)
+		//newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
+//	else if(opcode(state.IDEX.instr) == LW || opcode(state.IDEX.instr) == SW)
+	//	newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
+	//else if(opcode(state.IDEX.instr) == BEQ)
+//		newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
+//
+	//newState.EXMEM.readRegB = state.IDEX.readRegB;
 	newState.EXMEM.instr = state.IDEX.instr;
 
 
@@ -217,7 +226,7 @@ main(int argc, char *argv[])
 		newState.IFID.instr = NOOPINSTRUCTION;
 		newState.IDEX.instr = NOOPINSTRUCTION;
 		newState.EXMEM.instr = NOOPINSTRUCTION;
-		newState.EXMEM.branchTarget = 0;
+		//newState.EXMEM.branchTarget = 0;
 	}
 
 
@@ -266,19 +275,25 @@ int checkDataHaz(const stateType *state, stateType *newState){
 		else if(field1(cur) == getDest(wbend))
 			regB = state->WBEND.writeData;
 
-		if(opcode(cur) == ADD)
+		if(opcode(cur) == ADD){
+			newState->EXMEM.readRegB = regB;
 			return (regA + regB);
-		else if(opcode(cur) == NAND)
+		}
+		else if(opcode(cur) == NAND){
+			newState->EXMEM.readRegB = regB;
 			return ~(regA & regB);
+		}
 		else if(opcode(cur) == BEQ){
-			if(regA == regB)
-				newState->EXMEM.branchTarget = state->IDEX.pcPlus1 + state->IDEX.offset;
+			newState->EXMEM.readRegB = regB;
+			newState->EXMEM.branchTarget = state->IDEX.pcPlus1 + state->IDEX.offset;
 			return(regA - regB);
 		}
+
 	}
 
 	else if(opcode(cur) == LW || opcode(cur) == SW){
 		int regA = state->IDEX.readRegA;
+		int regB = state->IDEX.readRegB;
 
 		if(field0(cur) == getDest(exmem))
 			regA = state->EXMEM.aluResult;
@@ -287,38 +302,39 @@ int checkDataHaz(const stateType *state, stateType *newState){
 		else if(field0(cur) == getDest(wbend))
 			regA = state->WBEND.writeData;
 
+		newState->EXMEM.readRegB = regB;
 		return (regA + state->IDEX.offset);
 	}
 return 0;
 }
 
 int lwStall(const stateType *state){
-	int cur = state->instrMem[state->pc];
-	int ifid = state->IFID.instr;
+	int cur = state->IFID.instr;//state->instrMem[state->pc];
+	//int ifid = state->IFID.instr;
 	int idex = state->IDEX.instr;
-	int exmem = state->EXMEM.instr;
+	//int exmem = state->EXMEM.instr;
 	//int memwb = state->MEMWB.instr;
 	//int wbend = state->WBEND.instr;
 
 
 	if(opcode(cur) == ADD || opcode(cur) == NAND || opcode(cur) == BEQ){
 
-		if(field0(cur) == getDest(ifid) && opcode(ifid) == LW)
+		//if(field0(cur) == getDest(ifid) && opcode(ifid) == LW)
+		//	return 1;
+		if(field0(cur) == getDest(idex) && opcode(idex) == LW)
 			return 1;
-		else if(field0(cur) == getDest(idex) && opcode(idex) == LW)
-			return 1;
-		else if(field0(cur) == getDest(exmem) && opcode(exmem) == LW)
-			return 1;
+		//else if(field0(cur) == getDest(exmem) && opcode(exmem) == LW)
+		//	return 1;
 		//else if(field0(cur) == getDest(memwb) && opcode(memwb) == LW)
-	//		return 1;
+		//	return 1;
 		//else if(field0(cur) == getDest(wbend) && opcode(wbend) == LW)
 		//	return 1;
-		else if(field1(cur) == getDest(ifid) && opcode(ifid) == LW)
-			return 1;
+		//else if(field1(cur) == getDest(ifid) && opcode(ifid) == LW)
+		//	return 1;
 		else if(field1(cur) == getDest(idex) && opcode(idex) == LW)
 			return 1;
-		else if(field1(cur) == getDest(exmem) && opcode(exmem) == LW)
-			return 1;
+		//else if(field1(cur) == getDest(exmem) && opcode(exmem) == LW)
+		//	return 1;
 		//else if(field1(cur) == getDest(memwb) && opcode(memwb) == LW)
 		//	return 1;
 		//else if(field1(cur) == getDest(wbend) && opcode(wbend) == LW)
@@ -328,12 +344,12 @@ int lwStall(const stateType *state){
 	}
 
 	else if(opcode(cur) == LW || opcode(cur) == SW){
-		if(field0(cur) == getDest(ifid) && opcode(ifid) == LW)
+		//if(field0(cur) == getDest(ifid) && opcode(ifid) == LW)
+		//	return 1;
+		if(field0(cur) == getDest(idex) && opcode(idex) == LW)
 			return 1;
-		else if(field0(cur) == getDest(idex) && opcode(idex) == LW)
-			return 1;
-		else if(field0(cur) == getDest(exmem) && opcode(exmem) == LW)
-			return 1;
+		//else if(field0(cur) == getDest(exmem) && opcode(exmem) == LW)
+		//	return 1;
 		//else if(field0(cur) == getDest(memwb) && opcode(memwb) == LW)
 		//	return 1;
 		//else if(field0(cur) == getDest(wbend) && opcode(wbend) == LW)
