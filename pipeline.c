@@ -82,7 +82,7 @@ int field1(int instruction);
 int field2(int instruction);
 int opcode(int instruction);
 void printInstruction(int instr);
-int checkDataHaz(const stateType *state);
+int checkDataHaz(const stateType *state, stateType *newState);
 int lwStall(const stateType *state);
 int getDest(int instr);
 
@@ -147,14 +147,14 @@ main(int argc, char *argv[])
 	/* --------------------- IF stage --------------------- */
 
 	if(!lwStall(&state)){
-	if(state.EXMEM.branchTarget == 0){
+	//if(state.EXMEM.branchTarget == 0){
 		newState.IFID.pcPlus1 = state.pc + 1;
 		newState.pc = state.pc + 1;
-	}
-	else {
-		newState.IFID.pcPlus1 = state.EXMEM.branchTarget;
-		newState.pc = state.EXMEM.branchTarget;
-	}
+	//}
+	//else {
+	//	newState.IFID.pcPlus1 = state.EXMEM.branchTarget;
+	//	newState.pc = state.EXMEM.branchTarget;
+	//}
 
 	//if(opcode(state.instrMem[state.pc]) >= 0 //probably remove ifelse
 		//	&& opcode(state.instrMem[state.pc]) <= 7)
@@ -184,18 +184,20 @@ main(int argc, char *argv[])
 
 
 	/* --------------------- EX stage --------------------- */
-	if(opcode(state.IDEX.instr) == BEQ
-			&& state.IDEX.readRegA == state.IDEX.readRegB)
-		newState.EXMEM.branchTarget = state.IDEX.offset + state.IDEX.pcPlus1;
-	else
-		newState.EXMEM.branchTarget = 0;
+	//if(opcode(state.IDEX.instr) == BEQ
+	//		&& state.IDEX.readRegA == state.IDEX.readRegB)
+	//	newState.EXMEM.branchTarget = state.IDEX.offset + state.IDEX.pcPlus1;
+	//else
+	//	newState.EXMEM.branchTarget = 0;
 
 	if(opcode(state.IDEX.instr) == ADD)
-		newState.EXMEM.aluResult = checkDataHaz(&state); //state.IDEX.readRegA + state.IDEX.readRegB;
+		newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
 	else if(opcode(state.IDEX.instr) == NAND)
-		newState.EXMEM.aluResult = checkDataHaz(&state);//~(state.IDEX.readRegA & state.IDEX.readRegB);
+		newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
 	else if(opcode(state.IDEX.instr) == LW || opcode(state.IDEX.instr) == SW)
-		newState.EXMEM.aluResult = checkDataHaz(&state);//state.IDEX.readRegA + state.IDEX.offset;
+		newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
+	else if(opcode(state.IDEX.instr) == BEQ)
+		newState.EXMEM.aluResult = checkDataHaz(&state, &newState);
 
 	newState.EXMEM.readRegB = state.IDEX.readRegB;
 	newState.EXMEM.instr = state.IDEX.instr;
@@ -209,6 +211,14 @@ main(int argc, char *argv[])
 		newState.dataMem[state.EXMEM.aluResult] = state.EXMEM.readRegB;
 	else
 		newState.MEMWB.writeData = state.EXMEM.aluResult;
+
+	if(opcode(state.EXMEM.instr) == BEQ && state.EXMEM.aluResult == 0){
+		newState.pc = state.EXMEM.branchTarget;
+		newState.IFID.instr = NOOPINSTRUCTION;
+		newState.IDEX.instr = NOOPINSTRUCTION;
+		newState.EXMEM.instr = NOOPINSTRUCTION;
+		newState.EXMEM.branchTarget = 0;
+	}
 
 
 	/* --------------------- WB stage --------------------- */
@@ -231,14 +241,14 @@ main(int argc, char *argv[])
     return(0);
 }
 
-int checkDataHaz(const stateType *state){
-//only call this for add nand lw sw, sets aluresult
+int checkDataHaz(const stateType *state, stateType *newState){
+//only call this for BEQ add nand lw sw, sets aluresult
 	int cur = state->IDEX.instr;
 	int exmem = state->EXMEM.instr;
 	int memwb = state->MEMWB.instr;
 	int wbend = state->WBEND.instr;
 
-	if(opcode(cur) == ADD || opcode(cur) == NAND){
+	if(opcode(cur) == ADD || opcode(cur) == NAND || opcode(cur) == BEQ){
 		int regA = state->IDEX.readRegA;
 		int regB = state->IDEX.readRegB;
 
@@ -258,8 +268,13 @@ int checkDataHaz(const stateType *state){
 
 		if(opcode(cur) == ADD)
 			return (regA + regB);
-		else
+		else if(opcode(cur) == NAND)
 			return ~(regA & regB);
+		else if(opcode(cur) == BEQ){
+			if(regA == regB)
+				newState->EXMEM.branchTarget = state->IDEX.pcPlus1 + state->IDEX.offset;
+			return(regA - regB);
+		}
 	}
 
 	else if(opcode(cur) == LW || opcode(cur) == SW){
