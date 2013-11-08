@@ -256,10 +256,13 @@ int checkDataHaz(const stateType *state, stateType *newState){
 	int exmem = state->EXMEM.instr;
 	int memwb = state->MEMWB.instr;
 	int wbend = state->WBEND.instr;
+	int regA = state->IDEX.readRegA;
+	int regB = state->IDEX.readRegB;
 
-	if(opcode(cur) == ADD || opcode(cur) == NAND || opcode(cur) == BEQ){
-		int regA = state->IDEX.readRegA;
-		int regB = state->IDEX.readRegB;
+	if(opcode(cur) == ADD || opcode(cur) == NAND || opcode(cur) == BEQ
+			|| opcode(cur) == SW){
+		//int regA = state->IDEX.readRegA;
+		//int regB = state->IDEX.readRegB;
 
 		if(field0(cur) == getDest(exmem))
 			regA = state->EXMEM.aluResult;
@@ -288,12 +291,16 @@ int checkDataHaz(const stateType *state, stateType *newState){
 			newState->EXMEM.branchTarget = state->IDEX.pcPlus1 + state->IDEX.offset;
 			return(regA - regB);
 		}
+		else if(opcode(cur) == SW){
+			newState->EXMEM.readRegB = regB;
+			return (regA + state->IDEX.offset);
+		}
 
 	}
 
-	else if(opcode(cur) == LW || opcode(cur) == SW){
-		int regA = state->IDEX.readRegA;
-		int regB = state->IDEX.readRegB;
+	else if(opcode(cur) == LW){// || opcode(cur) == SW){
+		//int regA = state->IDEX.readRegA;
+		//int regB = state->IDEX.readRegB;
 
 		if(field0(cur) == getDest(exmem))
 			regA = state->EXMEM.aluResult;
@@ -305,6 +312,7 @@ int checkDataHaz(const stateType *state, stateType *newState){
 		newState->EXMEM.readRegB = regB;
 		return (regA + state->IDEX.offset);
 	}
+	newState->EXMEM.readRegB = regB;
 return 0;
 }
 
