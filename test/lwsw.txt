@@ -1,0 +1,8 @@
+	lw 0 7 negone
+	lw 0 6 two
+	sw 0 6 2
+	lw 0 5 2
+	sw 0 5 3
+	halt
+negone .fill -1
+two .fill 3

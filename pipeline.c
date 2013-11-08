@@ -270,7 +270,8 @@ int lwStall(const stateType *state){
 	int cur = state->IFID.instr;
 	int idex = state->IDEX.instr;
 
-	if(opcode(cur) == ADD || opcode(cur) == NAND || opcode(cur) == BEQ){
+	if(opcode(cur) == ADD || opcode(cur) == NAND || opcode(cur) == BEQ
+			|| opcode(cur) == SW){
 		if(field0(cur) == getDest(idex) && opcode(idex) == LW)
 			return 1;
 		else if(field1(cur) == getDest(idex) && opcode(idex) == LW)
@@ -279,7 +280,7 @@ int lwStall(const stateType *state){
 			return 0;
 	}
 
-	else if(opcode(cur) == LW || opcode(cur) == SW){
+	else if(opcode(cur) == LW){
 		if(field0(cur) == getDest(idex) && opcode(idex) == LW)
 			return 1;
 		else
