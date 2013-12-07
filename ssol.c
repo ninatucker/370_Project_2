@@ -19,6 +19,20 @@
 #define HALT 6
 #define NOOP 7
 
+#define MAXSETS 256
+#define MAXBLOCKSPERSET 256
+#define MAXSIZEINWORDS 8192
+
+int cache[MAXSETS][MAXBLOCKSPERSET][MAXSIZEINWORDS];
+
+int BLOCKSIZE = 0;
+int NUMSETS = 0;
+int BLOCKS = 0;
+
+int SIZE = 0;
+//SIZE: the total number of words in the cache is
+//       blockSizeInWords * numberOfSets * blocksPerSet
+
 typedef struct stateStruct {
     int pc;
     int mem[NUMMEMORY];
@@ -38,8 +52,9 @@ main(int argc, char *argv[])
     stateType state;
     FILE *filePtr;
 
-    if (argc != 2) {
-	printf("error: usage: %s <machine-code file>\n", argv[0]);
+    if (argc != 5) {
+	printf("error: usage: missing arg val or missing file %s "
+			"<machine-code file>\n", argv[0]);
 	exit(1);
     }
 
@@ -78,6 +93,12 @@ main(int argc, char *argv[])
 
     printf("\n");
     
+
+//SET GLOBALS FROM ARGS, ARGS PRESENT CHECKED ABOVE
+    BLOCKSIZE = atoi(argv[2]);
+    NUMSETS = atoi(argv[3]);
+    BLOCKS = atoi(argv[4]);
+    SIZE = BLOCKSIZE * NUMSETS * BLOCKS;
     /* run never returns */
     run(state);
 
