@@ -249,7 +249,8 @@ void store(int address,  int data){
 	int leastI = 0; int leastJ = 0; int leastK = 0;
 	int lastUsed = -1;
 	int i, j, k;
-	for(i = si; i < bl; i++){
+	//for(i = si; i < bl; i++){
+	i = si;
 		for(j = 0; j < BLOCKSPERSET; j++){
 			for(k = 0; k < BLOCKSIZE; k++){
 				//if it is in the cache just mark dirty
@@ -271,10 +272,11 @@ void store(int address,  int data){
 				}
 			}
 		}
-	}
+	//}
 
 	if(!found && empty){
 		printAction(address - bl, BLOCKSIZE, memoryToCache);
+		//SET ENTIRE BLOCK NEEDED HERE
 		printAction(address, 1, processorToCache);
 		cache[leastI][leastJ][leastK].tag = tag;
 		cache[leastI][leastJ][leastK].lastUsed = COUNT;
@@ -285,10 +287,12 @@ void store(int address,  int data){
 		cache[leastI][leastJ][leastK].dirty = 1;
 		cache[leastI][leastJ][leastK].lastUsed = COUNT;
 		printAction(address, 1, processorToCache);
+		//need EVICT RANGE FUNCTION HERE AS WELL, AND RANGE SET BLOCK
 	}
 	else if(!found){//ie not dirty and not found
 		printAction(address - bl, BLOCKSIZE, memoryToCache);
 		//NOT CORRECT, NEED WAY TO SET ENTIRE BLOCK TO ADDRESS RANGE
+		// also need EVICT function to remove entire block
 	}
 
 
@@ -300,9 +304,6 @@ int checkDirty(int address){
 	int bl = getBlockOff(address);
 	int tag = getTag(address);
 	int dirty = 0;
-	int empty = 0;
-	int leastI = 0; int leastJ = 0; int leastK = 0;
-	int lastUsed = -1;
 	int i, j, k;
 	for(i = si; i < bl; i++){
 		for(j = 0; j < BLOCKSPERSET; j++){
