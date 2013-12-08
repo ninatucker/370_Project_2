@@ -1,28 +1,77 @@
-When adding a stall for lw dependency, the pc should not increase
- - could this be your problem?
+The only difference that you'll have in main() is to ensure that you never go straight to memory. In other words, you probably want to edit all instances of state.mem[] such that you're first checking the cache.
+I personally recommend defining and using two functions such as the following:
+
+int load(int address)
+// Fetches (and returns) the data either from cache or from memory.
+// ((For LW's and instruction fetching)).
+
+void store(int address, int data)
+// Places data to the appropriate place in the cache.
+// ((For SW's only)).
+
+Just replace your instruction fetch, lw and sw logic with these two functions, and your main() / run() is good to go. This way, you will never have to touch (or debug) main ever again!!
  
- I don't think you should need it, because every pipeline register has an 
- instruction reg, which also contains the register numbers if you need them. 
- The extra WBEND register is give so you can detect 
- and forward data for dependent instructions that are 3 instructions apart.
+DISCLAIMER: This is NOT required!! This is just one way of organizing your project, and you can easily score a 100 without using these functions.
+
+
  
-As for your ALU question:
-"The ALU should be able to take its inputs from any pipeline register (instead 
-of just the IDEX register)." -from the spec
+===== Address Parsing =====
  
-But it seems you are asking if you need the "ALU" to check previous 
-instructions, which you don't.You can compare instructions from all 
-and anything inside pipeline registers without the use of the ALU.
-The explanation for this is, correct me if I am wrong, that 
-you are creating a separate control logic for data forwarding,
- which is going to be separate from the ALU, and can see all the 
- pipeline stages at once in a cycle.
+Regardless of your associativity type, you need a certain number of bits for your block offset and for your set index, and the rest of your address is the tag.
  
- EDIT:
-The student answer is generally correct: you don't need an array of 
-destReg's because at the EX stage you can read the instructions from 
-other pipeline registers, but if you want to do so there is certainly 
-nothing stopping you. And the student is right, there is separate control
- logic for data forwarding, not part of the ALU. In my original answer 
- I didn't think about the potential for confusion there.
+Here's how to calculate tag/set index/block offset bits:
  
+* Note: log2(x) means logarithm of x with base 2.
+**Further note: "Cache size in blocks" = Cache Size / (Number of bytes per block).
+ 
+--> Block Offset (BO) bits = log2(Number of bytes per block).
+--> Set Index (SI) bits = log2(Cache size in blocks / Ways per set)
+--> TAG = (Total Address Size) - BO - SI.
+ 
+Note that these equations hold REGARDLESS OF ASSOCIATIVITY!!
+ 
+You may not be convinced by the above statement, as "Fully Associative" caches clearly don't have a Set Index (SI), so any formula that calculates the SI bits can't be applicable to the fully associative case, right?
+ 
+Well, you'd be surprised.
+ 
+Come back to the definition that "Fully Associative" is just "N-Way Set Associative where N is the cache size in blocks", and use the formula I gave. This is what you'll get:
+ 
+SI bits = log2(Cache size in blocks / Ways Per Set)
+= log2(N / N)
+= log2(1)
+= 0.
+ 
+As you can see, the equation suggests we don't need SI bits for fully associative, so it actually DOES hold for the fully associative case. And before you try it, it also holds for the direct-mapped case.
+ 
+TL;DR for this section: The three equations given above hold for all associativity types, and they enable you to calculate the number of bits for tag / set index / block offset for ANY associativity. Note them down somewhere; they will be handy.
+ 
+===== Cache Simulation =====
+ 
+Okay, so now we know how to get which part of the instruction is tag, set index or block offset. Now we need to understand how to use this information. Here's an example 16-bit address:
+ 
+1101010001111001
+ 
+Let's say that you used the equations in the previous section to calculate that you had 9 bits of tag, 4 bits of set index and 3 bits of block offset. So now your address looks like this:
+ 
+TAG: 110101110
+SI: 1001
+BO: 001
+ 
+Now, to figure out which block you need to grab from memory, just set the BO to 0 (which will give you the beginning of the block), and then set it to 111 (which will give you the end of the block).
+ 
+This means that you'll be grabbing everything between address 1101011101001000 and address 1101011101001111 from memory.
+ 
+The next question is to know where in the cache this block goes, and that is a two-part question. First, you need to figure out which set you belong to. This is trivially easy if you are fully associative (since by definition you only have 1 set), but for other associativity types, you need to refer to the set index.
+ 
+Since our SI in this case is 1001, we know that we gotta place this block of memory in the 1001'th (9th in decimal) set of the cache. So that's that.
+ 
+The next thing to figure out is where in the set I place my block. After all, unless I'm direct-mapped, there are multiple blocks within a set.
+ 
+This is when I have to use the LRU bits (or another eviction policy) to figure out which block should be evicted from the cache. Though, that's not what this post is about, so I'll just assume that you handle the LRU correctly.
+ 
+Well... that is how you simulate cache accesses regardless of the instruction type.
+ 
+TL;DR You need to first parse the address as described in the above section, then grab the relevant block from memory (not just 1 address, but the ENTIRE BLOCK that the address is in). Finally, you use the SI bits and the LRU bits to figure out where you'll place the block in the cache.
+
+
+memoryAddress / blockSize) / numberOfSets

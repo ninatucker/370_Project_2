@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #define NUMMEMORY 65536 /* maximum number of words in memory */
 #define NUMREGS 8 /* number of machine registers */
@@ -23,13 +24,25 @@
 #define MAXBLOCKSPERSET 256
 #define MAXSIZEINWORDS 8192
 
-int cache[MAXSETS][MAXBLOCKSPERSET][MAXSIZEINWORDS];
+typedef struct WordStruct {
+    int tag;
+    int data;
+    int dirty;
+    int lastUsed;
+} WordType;
+
+WordType cache[MAXSETS][MAXBLOCKSPERSET][MAXSIZEINWORDS];
+int lru[MAXSETS][MAXBLOCKSPERSET];
+int COUNT = 0;
 
 int BLOCKSIZE = 0;
 int NUMSETS = 0;
-int BLOCKS = 0;
+int BLOCKSPERSET = 0;
 
-int SIZE = 0;
+int SIZEINWORDS = 0;
+int SIZEINBLOCKS = 0;
+int SIBITS = 0;
+int BLOCKOFFSETBITS = 0;
 //SIZE: the total number of words in the cache is
 //       blockSizeInWords * numberOfSets * blocksPerSet
 
@@ -43,6 +56,30 @@ typedef struct stateStruct {
 void printState(stateType *);
 void run(stateType);
 int convertNum(int);
+double log2 (double x);
+int getSetIndex(int word);
+int getBlockOff(int word);
+int getTag(int address);
+int load(int address);
+void store(int address, int data);
+
+enum actionType
+        {cacheToProcessor, processorToCache, memoryToCache, cacheToMemory,
+        cacheToNowhere};
+/*
+ * Log the specifics of each cache action.
+ *
+ * address is the starting word address of the range of data being transferred.
+ * size is the size of the range of data being transferred.
+ * type specifies the source and destination of the data being transferred.
+ *     cacheToProcessor: reading data from the cache to the processor
+ *     processorToCache: writing data from the processor to the cache
+ *     memoryToCache: reading data from the memory to the cache
+ *     cacheToMemory: evicting cache data by writing it to the memory
+ *     cacheToNowhere: evicting cache data by throwing it away
+ */
+void printAction(int address, int size, enum actionType type);
+
 
 int
 main(int argc, char *argv[])
@@ -97,9 +134,26 @@ main(int argc, char *argv[])
 //SET GLOBALS FROM ARGS, ARGS PRESENT CHECKED ABOVE
     BLOCKSIZE = atoi(argv[2]);
     NUMSETS = atoi(argv[3]);
-    BLOCKS = atoi(argv[4]);
-    SIZE = BLOCKSIZE * NUMSETS * BLOCKS;
+    BLOCKSPERSET = atoi(argv[4]);
+    SIZEINWORDS = BLOCKSIZE * NUMSETS * BLOCKSPERSET;
+    SIZEINBLOCKS = SIZEINWORDS / BLOCKSIZE; //CHECK THIS,
+    SIBITS = log2(SIZEINBLOCKS/ BLOCKSPERSET);
+    BLOCKOFFSETBITS = log2(BLOCKSIZE);
+
     /* run never returns */
+    int s;
+    int j;
+    int k;
+    for(s = 0; s < NUMSETS; s++){
+    	for(j = 0; j < BLOCKSPERSET; j++){
+    		for(k = 0; k < BLOCKSIZE; k++){
+    			cache[s][j][k].dirty = 0;
+    			cache[s][j][k].lastUsed = -1;
+    			cache[s][j][k].tag = 0;
+    		}
+    	}
+    }
+
     run(state);
 
     return(0);
@@ -181,6 +235,103 @@ run(stateType state)
     }
 }
 
+int load(int address){
+	int data;
+	return data;
+}
+
+void store(int address,  int data){
+	int si = getSetIndex(address);
+	int bl = getBlockOff(address);
+	int tag = getTag(address);
+	int found = 0;
+	int empty = 0;
+	int leastI = 0; int leastJ = 0; int leastK = 0;
+	int lastUsed = -1;
+	int i, j, k;
+	for(i = si; i < bl; i++){
+		for(j = 0; j < BLOCKSPERSET; j++){
+			for(k = 0; k < BLOCKSIZE; k++){
+				//if it is in the cache just mark dirty
+				if(cache[i][j][k].tag == tag && cache[i][j][k].lastUsed != -1){
+					cache[i][j][k].dirty = 1;
+					cache[i][j][k].lastUsed = COUNT;
+					found = 1;
+				}
+				else if(cache[i][j][k].lastUsed == -1){
+					leastI = i;
+					leastJ = j;
+					leastK = k;
+					empty = 1;
+				}
+				else if(cache[i][j][k].lastUsed < lastUsed){
+					leastI = i;
+					leastJ = j;
+					leastK = k;
+				}
+			}
+		}
+	}
+
+	if(!found && empty){
+		printAction(address - bl, BLOCKSIZE, memoryToCache);
+		printAction(address, 1, processorToCache);
+		cache[leastI][leastJ][leastK].tag = tag;
+		cache[leastI][leastJ][leastK].lastUsed = COUNT;
+		cache[leastI][leastJ][leastK].dirty = 1;
+	}
+	else if(!found && checkDirty(address)){
+		cache[leastI][leastJ][leastK].tag = tag;
+		cache[leastI][leastJ][leastK].dirty = 1;
+		cache[leastI][leastJ][leastK].lastUsed = COUNT;
+		printAction(address, 1, processorToCache);
+	}
+	else if(!found){//ie not dirty and not found
+		printAction(address - bl, BLOCKSIZE, memoryToCache);
+		//NOT CORRECT, NEED WAY TO SET ENTIRE BLOCK TO ADDRESS RANGE
+	}
+
+
+
+}
+
+int checkDirty(int address){
+	int si = getSetIndex(address);
+	int bl = getBlockOff(address);
+	int tag = getTag(address);
+	int dirty = 0;
+	int empty = 0;
+	int leastI = 0; int leastJ = 0; int leastK = 0;
+	int lastUsed = -1;
+	int i, j, k;
+	for(i = si; i < bl; i++){
+		for(j = 0; j < BLOCKSPERSET; j++){
+			for(k = 0; k < BLOCKSIZE; k++){
+				//if it is in the cache just mark dirty
+				if(cache[i][j][k].dirty){
+					dirty = 1;
+				}
+			}
+		}
+	}
+	if(dirty){
+		printAction(address - bl, BLOCKSIZE, cacheToMemory);
+	}
+	return dirty;
+}
+
+double log2 (double x){
+   return log(x)/log(2.0);
+}
+
+int getSetIndex(int word){
+	return ((word >> BLOCKOFFSETBITS) & SIBITS);
+}
+
+int getBlockOff(int word){
+	return(word & BLOCKOFFSETBITS);
+}
+
 void
 printState(stateType *statePtr)
 {
@@ -198,6 +349,8 @@ printState(stateType *statePtr)
     printf("end state\n");
 }
 
+
+
 int
 convertNum(int num)
 {
@@ -206,4 +359,25 @@ convertNum(int num)
 	num -= (1<<16);
     }
     return(num);
+}
+
+int getTag(int address){
+	return((address/BLOCKSIZE) /NUMSETS);
+}
+
+void
+printAction(int address, int size, enum actionType type)
+{
+    printf("@@@ transferring word [%d-%d] ", address, address + size - 1);
+    if (type == cacheToProcessor) {
+        printf("from the cache to the processor\n");
+    } else if (type == processorToCache) {
+        printf("from the processor to the cache\n");
+    } else if (type == memoryToCache) {
+        printf("from the memory to the cache\n");
+    } else if (type == cacheToMemory) {
+        printf("from the cache to the memory\n");
+    } else if (type == cacheToNowhere) {
+        printf("from the cache to nowhere\n");
+    }
 }
