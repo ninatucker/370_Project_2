@@ -242,8 +242,8 @@ run(stateType state)
 	} else if (opcode == NOOP) {
 	} else if (opcode == HALT) {
 	    printf("machine halted\n");
-	    printf("total of %d instructions executed\n", instructions+1);
-	    printf("final state of machine:\n");
+	   // printf("total of %d instructions executed\n", instructions+1);
+	  //  printf("final state of machine:\n");
 	    printState(&state);
 	    exit(0);
 	} else {
@@ -257,7 +257,7 @@ run(stateType state)
 int load(int address){
 
 	int bl = getBlockOff(address);
-	printf("address %d %d\n", address, bl);
+	//printf("address %d %d\n", address, bl);
 	int tag = getTag(address);
 	//int data;
 	IndexType index = LRU(address);
@@ -268,6 +268,7 @@ int load(int address){
 		cache[index.si][index.bi][index.wi].tag = tag;
 		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
 		cache[index.si][index.bi][index.wi].dirty = 0;
+		cache[index.si][index.bi][index.wi].address = address;
 		setClean(index);
 	}
 	else if(!index.found && !index.empty){
@@ -282,6 +283,7 @@ int load(int address){
 		cache[index.si][index.bi][index.wi].tag = tag;
 		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
 		cache[index.si][index.bi][index.wi].dirty = 0;
+		cache[index.si][index.bi][index.wi].address = address;
 		setClean(index);
 	}
 	else if(index.found){
@@ -289,8 +291,9 @@ int load(int address){
 		printAction(address, 1, cacheToProcessor);
 		cache[index.si][index.bi][index.wi].tag = tag;
 		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
-		cache[index.si][index.bi][index.wi].dirty = 0;
-		setClean(index);
+		cache[index.si][index.bi][index.wi].address = address;
+		//cache[index.si][index.bi][index.wi].dirty = 0;
+		//setClean(index);
 	}
 	COUNT++;
 	return 1;
@@ -441,17 +444,17 @@ void
 printState(stateType *statePtr)
 {
     int i;
-    printf("\n@@@\nstate:\n");
-    printf("\tpc %d\n", statePtr->pc);
-    printf("\tmemory:\n");
-	for (i=0; i<statePtr->numMemory; i++) {
-	    printf("\t\tmem[ %d ] %d\n", i, statePtr->mem[i]);
-	}
-    printf("\tregisters:\n");
-	for (i=0; i<NUMREGS; i++) {
-	    printf("\t\treg[ %d ] %d\n", i, statePtr->reg[i]);
-	}
-    printf("end state\n");
+   // printf("\n@@@\nstate:\n");
+   // printf("\tpc %d\n", statePtr->pc);
+   // printf("\tmemory:\n");
+	//for (i=0; i<statePtr->numMemory; i++) {
+	//    printf("\t\tmem[ %d ] %d\n", i, statePtr->mem[i]);
+	//}
+  //  printf("\tregisters:\n");
+	//for (i=0; i<NUMREGS; i++) {
+	//    printf("\t\treg[ %d ] %d\n", i, statePtr->reg[i]);
+	//}
+   // printf("end state\n");
 }
 
 
