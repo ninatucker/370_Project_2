@@ -7,7 +7,7 @@
 #include <string.h>
 #include <math.h>
 
-#define NUMMEMORY 65536 /* maximum number of words in memory */
+#define NUMMEMORY 8192 //65536 /* maximum number of words in memory */
 #define NUMREGS 8 /* number of machine registers */
 #define MAXLINELENGTH 1000
 
@@ -77,6 +77,8 @@ IndexType LRU(int address);
 void setClean(IndexType index);
 void setDirty(IndexType index);
 void setRange(IndexType index, int address);
+void setLRUrange(IndexType index);
+
 enum actionType
         {cacheToProcessor, processorToCache, memoryToCache, cacheToMemory,
         cacheToNowhere};
@@ -288,13 +290,24 @@ int load(int address){
 		setRange(index, address);
 	}
 	else if(index.found){
+		//DOUBLE CHECK IF EVICT NEEDED HERE, DONT THINK SO
 		printAction(address, 1, cacheToProcessor);
 		cache[index.si][index.bi][index.wi].tag = tag;
 		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
 		cache[index.si][index.bi][index.wi].address = address;
+		//need to set LRU for all, but not dirty bit?
+		//just added, NEEDS REVIEW AND TESTING
+		setLRUrange(index);
 	}
 	COUNT++;
 	return 1;
+}
+
+void setLRUrange(IndexType index){
+	int i;
+	for(i = 0; i < BLOCKSIZE; i++){
+		cache[index.si][index.bi][i].lastUsed = COUNT;
+	}
 }
 
 void setRange(IndexType index, int address){
@@ -330,7 +343,7 @@ void store(int address,  int data){
 	IndexType index = LRU(address);
 ///////////////////////////////////////////////
 //NEED AN EVICTION HERE
-	if(!index.found){
+	if(!index.found && index.empty){
 		//load(address);
 		printAction(address - bl, BLOCKSIZE, memoryToCache);
 		printAction(address, 1, processorToCache);
@@ -338,7 +351,23 @@ void store(int address,  int data){
 		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
 		cache[index.si][index.bi][index.wi].dirty = 1;
 	}
-
+	else if(!index.found && !index.empty){
+		if(index.dirty){
+			printAction(index.word.address - getBlockOff(index.word.address)
+					, BLOCKSIZE, cacheToMemory);
+		}
+		else{
+			printAction(index.word.address - getBlockOff(index.word.address)
+					, BLOCKSIZE, cacheToNowhere);
+		}
+		printAction(address - bl, BLOCKSIZE, memoryToCache);
+		printAction(address, 1, processorToCache);
+		cache[index.si][index.bi][index.wi].tag = tag;
+		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
+		cache[index.si][index.bi][index.wi].dirty = 1;
+		setRange(index, address);
+		// NEED SET RANGE CLEAR HERE
+	}
 	else if(index.found){
 		printAction(address, 1, processorToCache);
 		cache[index.si][index.bi][index.wi].tag = tag;
@@ -386,6 +415,7 @@ IndexType LRU(int address){
 				}
 				if(cache[i][j][k].dirty){
 					index.dirty = j + 1;
+					//DOUBLE CHECK IF THIS SHOULD BE SET IF FOUND
 				}
 			}
 		}
