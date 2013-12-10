@@ -211,6 +211,8 @@ Here is a sample assembly-language program:
         lw      0       1       30
         halt
 
+anyName.<blockSizeInWords>.<numberOfSets>.<blocksPerSet>
+
 and its corresponding output with the following cache parameters:
 blockSizeInWords = 4, numberOfSets = 2, and blocksPerSet = 1.  Make sure you
 understand each of the data transfers and their order.

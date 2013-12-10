@@ -75,3 +75,8 @@ TL;DR You need to first parse the address as described in the above section, the
 
 
 memoryAddress / blockSize) / numberOfSets
+
+
+
+
+Add up all the shortest and second shortest distances for the unvisited nodes, divide it by 2, add the shortest distance from the last visited node, add shortest distance from any node to 0. And it is pruning valid smaller routes.

@@ -29,7 +29,18 @@ typedef struct WordStruct {
     int data;
     int dirty;
     int lastUsed;
+    int address;
 } WordType;
+
+typedef struct IndexStruct {
+    int si;
+    int bi;
+    int wi;
+    int found;
+    int empty;
+    int dirty;
+    WordType word;
+} IndexType;
 
 WordType cache[MAXSETS][MAXBLOCKSPERSET][MAXSIZEINWORDS];
 int lru[MAXSETS][MAXBLOCKSPERSET];
@@ -62,7 +73,9 @@ int getBlockOff(int word);
 int getTag(int address);
 int load(int address);
 void store(int address, int data);
-
+IndexType LRU(int address);
+void setClean(IndexType index);
+void setDirty(IndexType index);
 enum actionType
         {cacheToProcessor, processorToCache, memoryToCache, cacheToMemory,
         cacheToNowhere};
@@ -144,12 +157,15 @@ main(int argc, char *argv[])
     int s;
     int j;
     int k;
+    int address = 0;
     for(s = 0; s < NUMSETS; s++){
     	for(j = 0; j < BLOCKSPERSET; j++){
     		for(k = 0; k < BLOCKSIZE; k++){
     			cache[s][j][k].dirty = 0;
     			cache[s][j][k].lastUsed = -1;
     			cache[s][j][k].tag = 0;
+    			cache[s][j][k].address = address;
+    			address++;
     		}
     	}
     }
@@ -185,6 +201,7 @@ run(stateType state)
 
 	addressField = convertNum(state.mem[state.pc] & 0xFFFF); /* for beq,
 								    lw, sw */
+	load(state.pc);
 	state.pc++;
 	if (opcode == ADD) {
 	    state.reg[arg2] = state.reg[arg0] + state.reg[arg1];
@@ -196,6 +213,7 @@ run(stateType state)
 		printf("address out of bounds\n");
 		exit(1);
 	    }
+    load(state.reg[arg0] + addressField);
 	    state.reg[arg1] = state.mem[state.reg[arg0] + addressField];
 	    if (state.reg[arg0] + addressField > maxMem) {
 		maxMem = state.reg[arg0] + addressField;
@@ -206,6 +224,7 @@ run(stateType state)
 		printf("address out of bounds\n");
 		exit(1);
 	    }
+	store(state.reg[arg0] + addressField, 1);
 	    state.mem[state.reg[arg0] + addressField] = state.reg[arg1];
 	    if (state.reg[arg0] + addressField > maxMem) {
 		maxMem = state.reg[arg0] + addressField;
@@ -236,87 +255,170 @@ run(stateType state)
 }
 
 int load(int address){
-	int data;
-	return data;
+
+	int bl = getBlockOff(address);
+	printf("address %d %d\n", address, bl);
+	int tag = getTag(address);
+	//int data;
+	IndexType index = LRU(address);
+
+	if(!index.found && index.empty){
+		printAction(address - bl, BLOCKSIZE, memoryToCache);
+		printAction(address, 1, cacheToProcessor);
+		cache[index.si][index.bi][index.wi].tag = tag;
+		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
+		cache[index.si][index.bi][index.wi].dirty = 0;
+		setClean(index);
+	}
+	else if(!index.found && !index.empty){
+		if(index.dirty){
+			printAction(index.word.address - getBlockOff(index.word.address), BLOCKSIZE, cacheToMemory);
+		}
+		else{
+			printAction(index.word.address - getBlockOff(index.word.address), BLOCKSIZE, cacheToNowhere);
+		}
+		printAction(address - bl, BLOCKSIZE, memoryToCache);
+		printAction(address, 1, cacheToProcessor);
+		cache[index.si][index.bi][index.wi].tag = tag;
+		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
+		cache[index.si][index.bi][index.wi].dirty = 0;
+		setClean(index);
+	}
+	else if(index.found){
+		// check this, may still have to evict if the block is dirty
+		printAction(address, 1, cacheToProcessor);
+		cache[index.si][index.bi][index.wi].tag = tag;
+		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
+		cache[index.si][index.bi][index.wi].dirty = 0;
+		setClean(index);
+	}
+	COUNT++;
+	return 1;
 }
 
+void setClean(IndexType index){
+	int i;
+	for(i = 0; i < BLOCKSIZE; i++){
+		cache[index.si][index.bi][i].dirty = 0;
+		cache[index.si][index.bi][i].lastUsed = COUNT;
+	}
+}
+
+void setDirty(IndexType index){
+	int i;
+	for(i = 0; i < BLOCKSIZE; i++){
+		cache[index.si][index.bi][i].dirty = 1;
+		cache[index.si][index.bi][i].lastUsed = COUNT;
+	}
+}
 void store(int address,  int data){
+	int bl = getBlockOff(address);
+	int tag = getTag(address);
+
+	IndexType index = LRU(address);
+
+	if(!index.found){// && empty){ SHOULDN'T MATTER IF EMPTY OR NOT
+		printAction(address - bl, BLOCKSIZE, memoryToCache);
+		printAction(address, 1, processorToCache);
+		cache[index.si][index.bi][index.wi].tag = tag;
+		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
+		cache[index.si][index.bi][index.wi].dirty = 1;
+		setDirty(index);
+	}
+
+	else if(index.found){
+		printAction(address, 1, processorToCache);
+		cache[index.si][index.bi][index.wi].tag = tag;
+		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
+		cache[index.si][index.bi][index.wi].dirty = 1;
+		setDirty(index);
+	}
+
+COUNT++;
+
+}
+
+IndexType LRU(int address){
 	int si = getSetIndex(address);
 	int bl = getBlockOff(address);
 	int tag = getTag(address);
 	int found = 0;
-	int empty = 0;
+	int empty = 1;
 	int leastI = 0; int leastJ = 0; int leastK = 0;
-	int lastUsed = -1;
+	int lastUsed = COUNT;
 	int i, j, k;
 	//for(i = si; i < bl; i++){
 	i = si;
+	IndexType index;
+	index.dirty = 0;
+	index.empty = 1;
+	index.found = 0;
+	index.bi = 0;
+	index.si = getSetIndex(address);
 		for(j = 0; j < BLOCKSPERSET; j++){
-			for(k = 0; k < BLOCKSIZE; k++){
+			for(k = 0 ; k < BLOCKSIZE; k++){
 				//if it is in the cache just mark dirty
 				if(cache[i][j][k].tag == tag && cache[i][j][k].lastUsed != -1){
-					cache[i][j][k].dirty = 1;
-					cache[i][j][k].lastUsed = COUNT;
+					index.si = i;
+					index.bi = j;
+					index.wi = k;
+					index.word = cache[i][j][k];
+					index.found = 1;
 					found = 1;
+					index.empty = 0;
 				}
-				else if(cache[i][j][k].lastUsed == -1){
-					leastI = i;
-					leastJ = j;
-					leastK = k;
-					empty = 1;
+				//else if(!found && cache[i][j][k].lastUsed == -1){
+				//	index.si = i;
+				//	index.bi = j;
+				//	index.wi = k;
+				//	index.word = cache[i][j][k];
+					//index.empty = 1;
+					//empty = 1;
+				//}
+				else if(!found && cache[i][j][k].lastUsed < lastUsed){
+					index.si = i;
+					index.bi = j;
+					index.wi = k;
+					index.word = cache[i][j][k];
+					//index.empty = 1;
+					lastUsed = cache[i][j][k].lastUsed;
 				}
-				else if(cache[i][j][k].lastUsed < lastUsed){
-					leastI = i;
-					leastJ = j;
-					leastK = k;
+				if(cache[i][j][k].dirty){
+					index.dirty = j + 1;
 				}
 			}
 		}
-	//}
+		if(lastUsed > -1)
+			index.empty = 0;
 
-	if(!found && empty){
-		printAction(address - bl, BLOCKSIZE, memoryToCache);
-		//SET ENTIRE BLOCK NEEDED HERE
-		printAction(address, 1, processorToCache);
-		cache[leastI][leastJ][leastK].tag = tag;
-		cache[leastI][leastJ][leastK].lastUsed = COUNT;
-		cache[leastI][leastJ][leastK].dirty = 1;
-	}
-	else if(!found && checkDirty(address)){
-		cache[leastI][leastJ][leastK].tag = tag;
-		cache[leastI][leastJ][leastK].dirty = 1;
-		cache[leastI][leastJ][leastK].lastUsed = COUNT;
-		printAction(address, 1, processorToCache);
-		//need EVICT RANGE FUNCTION HERE AS WELL, AND RANGE SET BLOCK
-	}
-	else if(!found){//ie not dirty and not found
-		printAction(address - bl, BLOCKSIZE, memoryToCache);
-		//NOT CORRECT, NEED WAY TO SET ENTIRE BLOCK TO ADDRESS RANGE
-		// also need EVICT function to remove entire block
-	}
-
-
-
+	return index;
 }
 
-int checkDirty(int address){
+int checkDirty(int address, IndexType index){
 	int si = getSetIndex(address);
 	int bl = getBlockOff(address);
-	int tag = getTag(address);
+	//int tag = getTag(address);
 	int dirty = 0;
 	int i, j, k;
-	for(i = si; i < bl; i++){
-		for(j = 0; j < BLOCKSPERSET; j++){
+	//j = index.word.address - getBlockOff(index.word.address);
+	//for(i = si; i < bl; i++){
+	i = si;// do not need to check multiple sets
+		for(j = address - bl; j < BLOCKSPERSET; j++){
 			for(k = 0; k < BLOCKSIZE; k++){
 				//if it is in the cache just mark dirty
-				if(cache[i][j][k].dirty){
+				if(cache[index.si][j][k].dirty){
 					dirty = 1;
 				}
 			}
 		}
-	}
+	//}
 	if(dirty){
-		printAction(address - bl, BLOCKSIZE, cacheToMemory);
+		//printAction(address - bl, BLOCKSIZE, cacheToMemory);
+		printAction(index.word.address - getBlockOff(index.word.address), BLOCKSIZE, cacheToMemory);
+	}
+	else{
+		//printAction(address - bl, BLOCKSIZE, cacheToNowhere);
+		printAction(index.word.address - getBlockOff(index.word.address), BLOCKSIZE, cacheToNowhere);
 	}
 	return dirty;
 }
@@ -326,11 +428,13 @@ double log2 (double x){
 }
 
 int getSetIndex(int word){
-	return ((word >> BLOCKOFFSETBITS) & SIBITS);
+	//return ((word >> BLOCKOFFSETBITS) & SIBITS);
+	return((word / BLOCKSIZE) % NUMSETS);
 }
 
 int getBlockOff(int word){
-	return(word & BLOCKOFFSETBITS);
+	//return(word & BLOCKOFFSETBITS);
+	return (word % (BLOCKSIZE));
 }
 
 void
