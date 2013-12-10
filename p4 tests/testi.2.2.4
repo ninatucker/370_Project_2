@@ -1,0 +1,14 @@
+	lw 0 7 negone
+	lw 0 6 two
+	lw 0 5 three
+	lw 0 4 four
+	sw 0 5 25
+	lw 0 5 25
+	add 5 7 5
+	beq 0 5 done	
+	jalr 4 1 
+done halt
+negone .fill -1
+two .fill 2
+three .fill 6
+four .fill 4

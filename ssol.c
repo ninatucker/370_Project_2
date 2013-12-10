@@ -76,6 +76,7 @@ void store(int address, int data);
 IndexType LRU(int address);
 void setClean(IndexType index);
 void setDirty(IndexType index);
+void setDirtyRange(IndexType index, int address);
 void setRange(IndexType index, int address);
 void setLRUrange(IndexType index);
 
@@ -166,7 +167,7 @@ main(int argc, char *argv[])
     		for(k = 0; k < BLOCKSIZE; k++){
     			cache[s][j][k].dirty = 0;
     			cache[s][j][k].lastUsed = -1;
-    			cache[s][j][k].tag = 0;
+    			cache[s][j][k].tag = -1;
     			cache[s][j][k].address = address;
     			address++;
     		}
@@ -336,6 +337,17 @@ void setDirty(IndexType index){
 		cache[index.si][index.bi][i].lastUsed = COUNT;
 	}
 }
+
+void setDirtyRange(IndexType index, int address){
+	int bl = getBlockOff(address);
+	int i;
+	for(i = 0; i < BLOCKSIZE; i++){
+		cache[index.si][index.bi][i].dirty = 1;
+		cache[index.si][index.bi][i].lastUsed = COUNT;
+		cache[index.si][index.bi][i].address = address - bl + i;
+		cache[index.si][index.bi][i].tag = getTag(cache[index.si][index.bi][i].address);
+	}
+}
 void store(int address,  int data){
 	int bl = getBlockOff(address);
 	int tag = getTag(address);
@@ -375,7 +387,7 @@ void store(int address,  int data){
 		cache[index.si][index.bi][index.wi].dirty = 1;
 	}
 
-	setDirty(index);
+	setDirtyRange(index, address);
 
 COUNT++;
 
@@ -385,7 +397,7 @@ IndexType LRU(int address){
 	int si = getSetIndex(address);
 	int tag = getTag(address);
 	int found = 0;
-	int lastUsed = COUNT;
+	int lastUsed = COUNT+1;
 	int i, j, k;
 	i = si;
 	IndexType index;
@@ -414,14 +426,15 @@ IndexType LRU(int address){
 					lastUsed = cache[i][j][k].lastUsed;
 				}
 				if(cache[i][j][k].dirty){
-					index.dirty = j + 1;
+					//index.dirty = j + 1;
 					//DOUBLE CHECK IF THIS SHOULD BE SET IF FOUND
 				}
 			}
 		}
 		if(lastUsed > -1)
 			index.empty = 0;
-
+		if(cache[index.si][index.bi][index.wi].dirty)
+			index.dirty = 1;
 	return index;
 }
 
