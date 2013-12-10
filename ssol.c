@@ -291,13 +291,10 @@ int load(int address){
 		setRange(index, address);
 	}
 	else if(index.found){
-		//DOUBLE CHECK IF EVICT NEEDED HERE, DONT THINK SO
 		printAction(address, 1, cacheToProcessor);
 		cache[index.si][index.bi][index.wi].tag = tag;
 		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
 		cache[index.si][index.bi][index.wi].address = address;
-		//need to set LRU for all, but not dirty bit?
-		//just added, NEEDS REVIEW AND TESTING
 		setLRUrange(index);
 	}
 	COUNT++;
@@ -353,8 +350,7 @@ void store(int address,  int data){
 	int tag = getTag(address);
 
 	IndexType index = LRU(address);
-///////////////////////////////////////////////
-//NEED AN EVICTION HERE
+
 	if(!index.found && index.empty){
 		//load(address);
 		printAction(address - bl, BLOCKSIZE, memoryToCache);
@@ -378,7 +374,6 @@ void store(int address,  int data){
 		cache[index.si][index.bi][index.wi].lastUsed = COUNT;
 		cache[index.si][index.bi][index.wi].dirty = 1;
 		setRange(index, address);
-		// NEED SET RANGE CLEAR HERE
 	}
 	else if(index.found){
 		printAction(address, 1, processorToCache);
@@ -468,8 +463,6 @@ printState(stateType *statePtr)
 	//}
    // printf("end state\n");
 }
-
-
 
 int
 convertNum(int num)
